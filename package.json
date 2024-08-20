@@ -1,0 +1,23 @@
+{
+  "name": "model-info",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@antv/g2": "^5.2.2",
+    "@antv/s2": "2.0.0-next.25",
+    "@antv/s2-vue": "2.0.0-next.15",
+    "ant-design-vue": "4.0.0-rc.6",
+    "axios": "^1.7.3",
+    "vue": "^3.4.31"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.0.5",
+    "vite": "^5.3.4"
+  }
+}
