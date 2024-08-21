@@ -9,11 +9,12 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@antv/g2": "^5.2.2",
+    "@antv/g2": "^4.2.7",
     "@antv/s2": "2.0.0-next.25",
     "@antv/s2-vue": "2.0.0-next.15",
     "ant-design-vue": "4.0.0-rc.6",
     "axios": "^1.7.3",
+    "echarts": "^5.5.1",
     "vue": "^3.4.31"
   },
   "devDependencies": {

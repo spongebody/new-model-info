@@ -1,41 +1,23 @@
 <template>
-  <div class="f-container">
-    <h2 style="margin-bottom: 1em">Enter your query</h2>
-    <a-input-search
-      size="medium"
-      v-model:value="searchQueryName"
-      @search="fetchData"
-      placeholder="please enter your query in there"
-      style="margin-bottom: 20px; width: 60%"
-    />
-    <a-spin :spinning="loading">
-      <div class="content" :class="{ 'h-content': dataSource.length <= 0 }">
-        <div class="table-container">
-          <a-table
-            :row-class-name="
-              (_record, index) => (index % 2 === 1 ? 'table-striped' : null)
-            "
-            :dataSource="dataSource"
-            :columns="columns"
-            bordered
-          >
+  <div class="wrap">
+    <div class="page1-container">
+      <div class="top-head">
+        <h2 style="margin-bottom: 1em">Enter your query</h2>
+        <a-input-search ref="inputSearch" size="medium" v-model:value="searchQueryName" @search="fetchData"
+          placeholder="please enter your query in there" style="margin-bottom: 20px; width: 60%" />
+      </div>
+      <a-spin :spinning="loading">
+        <div v-if="dataSource.length" class="table-container">
+          <a-table :row-class-name="(_record, index) => (index % 2 === 1 ? 'table-striped' : null)
+          " :dataSource="dataSource" :columns="columns" bordered>
             <template #bodyCell="{ column, record }">
               <a-tooltip v-if="shouldShowTooltip(column.key)">
                 <template #title>
-                  <span
-                    v-if="column.dataIndex === 'BM25'"
-                    v-html="getTooltipContent(record['BM25'])"
-                  >
+                  <span v-if="column.dataIndex === 'BM25'" v-html="getTooltipContent(record['BM25'])">
                   </span>
-                  <span
-                    v-else-if="column.dataIndex === 'PL2'"
-                    v-html="getTooltipContent(record['PL2'])"
-                  >
+                  <span v-else-if="column.dataIndex === 'PL2'" v-html="getTooltipContent(record['PL2'])">
                   </span>
-                  <span
-                    v-else-if="column.dataIndex === 'TFIDF'"
-                    v-html="getTooltipContent(record['TFIDF'])"
-                  >
+                  <span v-else-if="column.dataIndex === 'TFIDF'" v-html="getTooltipContent(record['TFIDF'])">
                   </span>
                 </template>
                 <span>{{ record[column.dataIndex].docno }}</span>
@@ -44,12 +26,36 @@
             </template>
           </a-table>
         </div>
-        <div class="chart-container" ref="chartContainer"></div>
-      </div>
-      <div class="empty-container" v-if="!dataSource.length">
-        <a-empty description="暂无数据，请搜索查询。" />
-      </div>
-    </a-spin>
+        <div v-else class="empty-container">
+          <a-empty description="暂无数据，请搜索查询。" />
+        </div>
+      </a-spin>
+    </div>
+    <div v-show="dataSource.length" class="page2-container">
+      <a-row :gutter="12">
+        <!-- 第一列 -->
+        <a-col :span="12">
+          <div class="chart-container" ref="lineChartContainer"></div>
+        </a-col>
+        <!-- 第二列 -->
+        <a-col :span="12">
+          <div class="chart-container" ref="articleReplicationChartContainer"></div>
+        </a-col>
+      </a-row>
+      <a-row :gutter="12">
+        <!-- 第一列 -->
+        <a-col :span="12">
+          <div class="chart-container" ref="popularityChartContainer"></div>
+        </a-col>
+        <!-- 第二列 -->
+        <a-col :span="12">
+          <div class="chart-container" ref="genderChartContainer"></div>
+        </a-col>
+      </a-row>
+    </div>
+    <div v-show="dataSource.length" class="page3-container">
+      <world-map />
+    </div>
   </div>
 </template>
 
@@ -57,9 +63,11 @@
 import { ref, reactive, onMounted, h } from 'vue';
 import axios from 'axios';
 import { Chart } from '@antv/g2';
+import WorldMap from './WorldMap.vue';
 
 const searchQueryName = ref('');
 const loading = ref(false);
+const inputSearch = ref(null);
 
 const columns = ref([
   {
@@ -68,61 +76,65 @@ const columns = ref([
     key: 'rank',
     sorter: (a, b) => a.rank - b.rank,
   },
-  //   {
-  //     title: 'Score',
-  //     dataIndex: 'rfan',
-  //     key: 'score',
-  //     sorter: (a, b) => a.score - b.score,
-  //   },
-  { title: 'Model1-BM25', dataIndex: 'BM25', key: 'model1' },
-  { title: 'Model2-PL2', dataIndex: 'PL2', key: 'model2' },
-  { title: 'Model3-TFIDF', dataIndex: 'TFIDF', key: 'model3' },
+  { title: 'Model1-BM25', dataIndex: 'BM25', key: 'BM25' },
+  { title: 'Model2-PL2', dataIndex: 'PL2', key: 'PL2' },
+  { title: 'Model3-TFIDF', dataIndex: 'TFIDF', key: 'TFIDF' },
 ]);
-const tooltipColumns = ['model1', 'model2', 'model3']; // 需要添加 Tooltip 的列
+const tooltipColumns = ['BM25', 'PL2', 'TFIDF']; // 需要添加 Tooltip 的列
 
 const shouldShowTooltip = (columnKey) => {
   return tooltipColumns.includes(columnKey);
 };
 
 const getTooltipContent = (record) => {
-  // 获取与当前列相关的 model 对象
   let model = record;
-  //   if (record.model && record.name1 !== undefined) model = record.model;
-  //   else if (record.model2 && record.name2 !== undefined) model = record.model2;
-  //   else if (record.model3 && record.name3 !== undefined) model = record.model3;
-
-  //   if (model) {
-  //     return h('ul', [
-  //       h('li', `Class1: ${model.gender_category}`),
-  //       h('li', `Class2: ${model.relative_pageviews_category}`),
-  //       h('li', `Class3: ${model.num_sitelinks_category}`),
-  //       h('li', `Class4: ${model.rank}`),
-  //     ]);
-  //   }
   if (model) {
-    return `<div>gender: ${model.gender_category}, </div><div>pageviews: ${model.relative_pageviews_category},</div><div>num_sitelinks: ${model.num_sitelinks_category},</div><div>rank: ${model.rank}</div>`;
+    return `<div>Gender: ${model.gender_category}, </div><div>Popularity: ${model.relative_pageviews_category},</div><div>Article Replication: ${model.num_sitelinks_category},</div><div>rank: ${model.rank}</div>`;
   }
   return '';
 };
 const dataSource = ref([]);
 
-const chatData = ref([]);
+const articleReplicationChartContainer = ref(null);
+const popularityChartContainer = ref(null);
+const genderChartContainer = ref(null);
+const lineChartContainer = ref(null);
 
-const chartContainer = ref(null);
+let articleReplicationChart, popularityChart, genderChart, lineChart;
 
-let chart;
-
-const updateChart = (data = []) => {
-  if (chart) {
-    chart.changeData(data);
+const updateArticleReplicationChart = (data = []) => {
+  if (articleReplicationChart) {
+    articleReplicationChart.changeData(data);
   } else {
-    chart = new Chart({
-      container: chartContainer.value,
+    articleReplicationChart = new Chart({
+      container: articleReplicationChartContainer.value,
       autoFit: true,
-      height: 600,
+      type: 'view',
     });
 
-    chart
+    articleReplicationChart
+      .interval()
+      .attr('padding', 40)
+      .data(data)
+      .encode('x', 'class')
+      .encode('y', 'count')
+      .encode('color', 'name')
+      .transform({ type: 'dodgeX' })
+      .interaction('elementHighlight', { background: true });
+  }
+};
+
+const updatePopularityChart = (data = []) => {
+  if (popularityChart) {
+    popularityChart.changeData(data);
+  } else {
+    popularityChart = new Chart({
+      container: popularityChartContainer.value,
+      autoFit: true,
+      type: 'view',
+    });
+
+    popularityChart
       .interval()
       .data(data)
       .encode('x', 'class')
@@ -133,9 +145,60 @@ const updateChart = (data = []) => {
   }
 };
 
+const updateGenderChart = (data = []) => {
+  if (genderChart) {
+    genderChart.changeData(data);
+  } else {
+    genderChart = new Chart({
+      container: genderChartContainer.value,
+      autoFit: true,
+      type: 'view',
+    });
+
+    genderChart
+      .interval()
+      .data(data)
+      .encode('x', 'class')
+      .encode('y', 'count')
+      .encode('color', 'name')
+      .transform({ type: 'dodgeX' })
+      .interaction('elementHighlight', { background: true });
+  }
+};
+
+const updateLineChart = (data = []) => {
+  if (lineChart) {
+    lineChart.changeData(data);
+  } else {
+    lineChart = new Chart({
+      container: lineChartContainer.value,
+      autoFit: true,
+      type: 'view',
+    });
+
+    lineChart
+      .data(data)
+      .encode('x', 'Evaluation index')
+      .encode('y', 'value')
+      .encode('color', 'model')
+      .scale('x', {
+        range: [0, 1],
+      })
+      .scale('y', {
+        nice: true,
+      })
+      .axis('y');
+
+    lineChart.line().encode('shape', 'line');
+
+    lineChart.point().encode('shape', 'point').tooltip(false);
+  }
+};
+
 function transformData(columnData) {
   const rowData = [];
-  const numEntries = Object.keys(columnData.BM25.docno).length;
+  const modelName = columnData.BM25 ? 'BM25' : 'model1'; // 本地mock使用model1
+  const numEntries = Object.keys(columnData[modelName].docno).length;
 
   for (let i = 0; i < numEntries; i++) {
     let row = { rank: i + 1 };
@@ -145,8 +208,7 @@ function transformData(columnData) {
         rank: columnData[model].rank[i],
         score: columnData[model].score[i],
         gender_category: columnData[model].gender_category[i],
-        relative_pageviews_category:
-          columnData[model].relative_pageviews_category[i],
+        relative_pageviews_category: columnData[model].relative_pageviews_category[i],
         num_sitelinks_category: columnData[model].num_sitelinks_category[i],
       };
     }
@@ -160,10 +222,7 @@ function countCategories(data) {
   for (const model in data) {
     results[model] = {};
     for (const category in data[model]) {
-      if (
-        typeof data[model][category] === 'object' &&
-        category.includes('category')
-      ) {
+      if (typeof data[model][category] === 'object' && category.includes('category')) {
         for (const key in data[model][category]) {
           const value = data[model][category][key];
           if (!results[model][category]) {
@@ -177,6 +236,7 @@ function countCategories(data) {
       }
     }
   }
+  console.warn('results', results);
   return results;
 }
 
@@ -194,39 +254,47 @@ function formatCategoryCounts(data, categoryName) {
       }
     }
   }
+  console.warn('formattedResults', formattedResults);
   return formattedResults;
+}
+
+function getLineChartData() {
+  return [
+    { 'Evaluation index': 'MAP', model: 'BM25', value: 0.013967 },
+    { 'Evaluation index': 'MAP', model: 'PL2', value: 0.037314 },
+    { 'Evaluation index': 'MAP', model: 'F_IDF', value: 0.013984 },
+    { 'Evaluation index': 'NDCG', model: 'BM25', value: 0.037062 },
+    { 'Evaluation index': 'NDCG', model: 'PL2', value: 0.037314 },
+    { 'Evaluation index': 'NDCG', model: 'F_IDF', value: 0.037061 },
+  ]
+}
+
+const chartCategoryMap = {
+  gender: 'gender_category',
+  popularity: 'relative_pageviews_category',
+  articleReplication: 'num_sitelinks_category',
 }
 
 const fetchData = async () => {
   loading.value = true;
   console.log(searchQueryName.value);
   try {
-    const response = await axios.get('/search', {
+    const response = await axios.get('/mock.json', {
       params: { query: searchQueryName.value },
     });
+
     const data = transformData(response.data);
-    countCategories(response.data);
-    dataSource.value = data;
+    dataSource.value = data || [];
 
-    chatData.value = formatCategoryCounts(
-      countCategories(response.data),
-      'num_sitelinks_category'
-    );
-    // chatData.value = [
-    //   { name: 'model1', class: 'class1', 个数: 18 },
-    //   { name: 'model1', class: 'class2', 个数: 28 },
-    //   { name: 'model1', class: 'class3', 个数: 39 },
+    const categoriesData = countCategories(response.data);
 
-    //   { name: 'model2', class: 'class1', 个数: 12 },
-    //   { name: 'model2', class: 'class2', 个数: 23 },
-    //   { name: 'model2', class: 'class3', 个数: 34 },
+    formatCategoryCounts(categoriesData, chartCategoryMap['articleReplication']);
 
-    //   { name: 'model3', class: 'class1', 个数: 12 },
-    //   { name: 'model3', class: 'class2', 个数: 23 },
-    //   { name: 'model3', class: 'class3', 个数: 34 },
-    // ];
+    updateArticleReplicationChart(formatCategoryCounts(categoriesData, chartCategoryMap['articleReplication']));
+    updatePopularityChart(formatCategoryCounts(categoriesData, chartCategoryMap['popularity']));
+    updateGenderChart(formatCategoryCounts(categoriesData, chartCategoryMap['gender']));
+    updateLineChart(getLineChartData());
 
-    updateChart(chatData.value);
   } catch (error) {
     console.error('Error fetching data:', error);
   } finally {
@@ -235,71 +303,30 @@ const fetchData = async () => {
 };
 
 onMounted(() => {
-  updateChart();
+
+  inputSearch.value.focus();
+
+  updateArticleReplicationChart();
+  updatePopularityChart();
+  updateGenderChart();
+  updateLineChart();
 });
 </script>
 
-<style>
-:root {
-  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
-  color-scheme: light dark;
-  color: rgba(0, 0, 0, 0.87);
-  background-color: #f4f4f4;
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-.f-container {
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
-}
-
-.content {
-  display: flex;
-  justify-content: center;
-  align-items: stretch;
-  gap: 20px;
-  padding: 20px;
-  border-radius: 8px;
-
-  color: rgba(0, 0, 0, 0.87);
-  max-width: 90vw;
-  min-height: 70vh;
-  margin: 0 auto;
-}
-
-.table-container,
+<style scoped>
 .chart-container {
-  width: 45%;
-  background-color: #ffffff;
+  height: calc((100vh - 20px) / 2);
+  width: 40vw;
+}
+
+/* .page2-chart-container {
+  height: calc((100vh - 20px) / 2 - 20px);
   padding: 10px;
-  border-radius: 8px;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
-  color: rgba(0, 0, 0, 0.87);
-  min-height: 300px;
-  overflow: auto;
+  width: 35vw;
 }
 
-.h-content {
-  opacity: 0;
-  position: relative;
-}
-
-.empty-container {
-  position: absolute;
-  top: 30%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-}
-
-body {
-  background-image: url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0OCIgaGVpZ2h0PSI0OCIgZmlsbD0ibm9uZSI+PHBhdGggc3Ryb2tlPSIjMDAwIiBzdHJva2Utb3BhY2l0eT0iLjA0IiBzdHJva2Utd2lkdGg9Ii41IiBkPSJNLjI1LjI1aDQ3LjV2NDcuNUguMjV6Ii8+PC9zdmc+),
-    linear-gradient(to bottom, #0000 40%, rgb(232 232 236));
-  background-size: 48px 48px, 100% 100%, 100%;
-}
+.line-chart-container {
+  height: calc((100vh - 40px - 15vh - 20px) / 2);
+  width: 40vw;
+} */
 </style>

@@ -1,0 +1,45 @@
+html,
+body {
+  box-sizing: border-box;
+  margin: 0;
+}
+
+.wrap {
+  padding: 20px;
+  background-color: #ffffff;
+  text-align: center;
+  margin: 0 auto;
+  max-width: 1200px;
+}
+
+.page1-container {
+  width: 100%;
+  padding: 20px;
+  height: calc(100vh - 40px);
+  background-color: #ffffff;
+}
+
+.page2-container {
+  max-height: 100vh;
+  background-color: #ffffff;
+  padding: 20px;
+}
+
+.table-container {
+  height: calc(100vh - 40px - 15vh - 20px);
+  overflow-y: auto;
+  background-color: #ffffff;
+  padding: 10px;
+}
+
+.empty-container {
+  margin-top: 20px;
+}
+
+.table-striped {
+  background-color: #f7f7f7;
+}
+
+.top-header {
+  height: 15vh;
+}
